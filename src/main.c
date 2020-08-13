@@ -17,11 +17,17 @@ static const struct
 {
     float x, y;
     float r, g, b;
-} vertices[3] =
+} vertices[4] =
 {
-    { -0.6f, -0.4f, 1.f, 0.f, 0.f },
-    {  0.6f, -0.4f, 0.f, 1.f, 0.f },
-    {   0.f,  0.6f, 0.f, 0.f, 1.f }
+    {  0.5f,  0.5f, 1.f, 0.f, 0.f }, // top right
+    {  0.5f, -0.5f, 0.f, 1.f, 0.f }, // bottom right
+    { -0.5f, -0.5f, 0.f, 0.f, 1.f }, // bottom left
+    { -0.5f,  0.5f, 1.f, 0.f, 1.f }  // top left
+};
+ 
+static int indicies[6] = {
+    3, 0, 2,
+    0, 1, 2
 };
  
 static const char* vertex_shader_text =
@@ -86,7 +92,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 int main(void)
 {
     GLFWwindow* window;
-    GLuint vertex_buffer, vertex_shader, fragment_shader, program;
+    GLuint vertex_shader, fragment_shader, program;
     GLint mvp_location;
  
     glfwSetErrorCallback(error_callback);
@@ -114,12 +120,17 @@ int main(void)
  
     // NOTE: OpenGL error checks have been omitted for brevity
 
-    unsigned int VAO;
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
+    unsigned int vao, ebo, vbo;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
  
-    glGenBuffers(1, &vertex_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+    glGenBuffers(1, &ebo);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indicies), indicies, GL_STATIC_DRAW);
+ 
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
     // vPos
@@ -208,7 +219,7 @@ int main(void)
  
         glUseProgram(program);
         glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) mvp);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
  
         glfwSwapBuffers(window);
         glfwPollEvents();

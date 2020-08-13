@@ -24,7 +24,7 @@ static const struct
     { -0.5f, -0.5f, 0.f, 0.f, 1.f }, // bottom left
     { -0.5f,  0.5f, 1.f, 0.f, 1.f }  // top left
 };
- 
+
 static int indicies[6] = {
     3, 0, 2,
     0, 1, 2
@@ -38,11 +38,11 @@ static const char* vertex_shader_text =
 
 "out vec3 fcolor;\n"
 
-"uniform mat4 MVP;\n"
+"uniform mat4 mvp;\n"
 
 "void main()\n"
 "{\n"
-"    gl_Position = MVP * vec4(vPos, 0.0, 1.0);\n"
+"    gl_Position = mvp * vec4(vPos, 0.0, 1.0);\n"
 "    fcolor = vCol;\n"
 "}\n";
  
@@ -69,22 +69,22 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 
     const float step = 0.1;
 
-    if (key == GLFW_KEY_LEFT)
+    if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
         x -= step;
 
-    if (key == GLFW_KEY_RIGHT)
+    if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
         x += step;
 
-    if (key == GLFW_KEY_DOWN)
+    if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
         y -= step;
 
-    if (key == GLFW_KEY_UP)
+    if (key == GLFW_KEY_UP && action == GLFW_PRESS)
         y += step;
 
-    if (key == GLFW_KEY_SPACE)
+    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
         z += step;
 
-    if (key == GLFW_KEY_BACKSPACE)
+    if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS)
         z -= step;
 
 }
@@ -105,7 +105,7 @@ int main(void)
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_CENTER_CURSOR, GL_TRUE);
- 
+
     window = glfwCreateWindow(640, 480, "Simple example", NULL, NULL);
     if (!window)
     {
@@ -123,7 +123,7 @@ int main(void)
     unsigned int vao, ebo, vbo;
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
- 
+    
     glGenBuffers(1, &ebo);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
@@ -196,13 +196,13 @@ int main(void)
         free(info_buffer);
     }
  
-    mvp_location = glGetUniformLocation(program, "MVP");
+    mvp_location = glGetUniformLocation(program, "mvp");
 
     while (!glfwWindowShouldClose(window))
     {
         float ratio;
         int width, height;
-        mat4x4 m, p, mvp;
+        mat4x4 m, v, p, mvp;
  
         glfwGetFramebufferSize(window, &width, &height);
         ratio = width / (float) height;
@@ -210,12 +210,23 @@ int main(void)
         glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT);
  
+        // Model
         mat4x4_identity(m);
-        mat4x4_translate(m, x, y, z);
+        mat4x4_translate(m, 0.f, 0.f, -1.f);
         mat4x4_rotate_Z(m, m, (float) glfwGetTime());
-        mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-        // mat4x4_perspective(p, M_PI_2, ratio, 0.1f, 100.f);
-        mat4x4_mul(mvp, p, m);
+
+        // Perspective
+        // mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
+        mat4x4_perspective(p, M_PI_2, ratio, 0.1f, 100.f);
+
+        // View
+        vec3 eye = { x, y, z };
+        vec3 center = { x, y, z -1.0f };
+        vec3 up = { 0.0f, 1.0f, 0.0f };
+
+        mat4x4_look_at(v, eye, center, up);
+        mat4x4_mul(mvp, v, m);
+        mat4x4_mul(mvp, p, mvp);
  
         glUseProgram(program);
         glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) mvp);

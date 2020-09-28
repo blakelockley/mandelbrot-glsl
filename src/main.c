@@ -12,7 +12,7 @@
 #include "linmath.h"
 
 float pos[2] = { 0, 0 };
-double zoom = 1.0f;
+float zoom = 1.0f;
 
 int width = 640;
 int height = 480;
@@ -60,7 +60,7 @@ static const char* fragment_shader_text =
 "void main()\n"
 "{\n"
 "    vec2 px = gl_FragCoord.xy;\n"
-"    vec2 c = vec2(-2 + (px.x / width) * 3 + pos.x, -1 + (px.y / height) * 2 + pos.y);\n"
+"    vec2 c = vec2(-2 / zoom + (px.x / width) * (3 / zoom) + pos.x, -1 / zoom + (px.y / height) * (2 / zoom) + pos.y);\n"
 
 "    int n = 0;\n"
 "    vec2 z = vec2(0.0f, 0.0f);\n"
@@ -69,7 +69,9 @@ static const char* fragment_shader_text =
 "         n += 1;\n"
 "   }\n"
 
-"    color = vec4(n / 80.0f, n * 2 / 40.0f, 1 - n / 80.0f, 1.0f);\n"
+"   float a = n / 80.0f;\n"
+
+"   color = vec4(mix(vec3(3 / 255.0f, 207 / 255.0f, 252 / 255.0f), vec3(240 / 255.0f, 252 / 255.0f, 3 / 255.0f), a), 1.0f);\n"
 "}\n";
  
 static void error_callback(int error, const char* description)
@@ -83,19 +85,22 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     
     if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
-        pos[0] -= 0.1f;
+        pos[0] -= 1 / zoom;
     
     if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
-        pos[0] += 0.1f;
+        pos[0] += 1 / zoom;
     
     if (key == GLFW_KEY_UP && action == GLFW_PRESS)
-        pos[1] += 0.1f;
+        pos[1] += 1 / zoom;
     
     if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
-        pos[1] -= 0.1f;
+        pos[1] -= 1 / zoom;
     
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
-        zoom += 1.0f;
+        zoom *= 2;
+    
+    if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS)
+        zoom /= 2;
 }
  
 int main(void)
@@ -223,7 +228,7 @@ int main(void)
         glUseProgram(program);
         
         glUniform2fv(pos_location, 1, pos);
-        glUniform1d(zoom_location, zoom);
+        glUniform1f(zoom_location, zoom);
         glUniform1f(width_location, (float) width);
         glUniform1f(height_location, (float) height);
         

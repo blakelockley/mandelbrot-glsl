@@ -11,18 +11,21 @@
 
 #include "linmath.h"
 
-long double complex pos;
-long double zoom;
+float pos[2] = { 0, 0 };
+double zoom = 1.0f;
 
-static const struct
+int width = 640;
+int height = 480;
+
+static struct
 {
     float x, y;
 } vertices[4] =
 {
-    {  1 + (1/3.0f),  1.0f }, // top right
-    {  1 + (1/3.0f), -1.0f }, // bottom right
-    { -1 - (1/3.0f), -1.0f }, // bottom left
-    { -1 - (1/3.0f),  1.0f }  // top left
+    {  1,  1.0f }, // top right
+    {  1, -1.0f }, // bottom right
+    { -1, -1.0f }, // bottom left
+    { -1,  1.0f }  // top left
 };
 
 static int indicies[6] = {
@@ -34,33 +37,39 @@ static const char* vertex_shader_text =
 "#version 330 core\n"
 
 "layout(location = 0) in vec2 vPos;\n"
-"uniform mat4 mvp;\n"
 
 "void main()\n"
 "{\n"
-"    gl_Position = mvp * vec4(vPos, 0.0, 1.0);\n"
+"    gl_Position = vec4(vPos, 0.0, 1.0);\n"
 "}\n";
  
 static const char* fragment_shader_text =
 "#version 330 core\n"
+
 "#define mult(a, b) vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x) \n"
-"#define leng(c) sqrt(c.x * c.x + c.y * c.y) \n"
+"#define dist(c) sqrt(c.x * c.x + c.y * c.y) \n"
+
+"uniform vec2 pos;\n"
+"uniform float zoom;\n"
+
+"uniform float width;\n"
+"uniform float height;\n"
 
 "out vec4 color;\n"
 
 "void main()\n"
 "{\n"
-"    vec2 pos = vec2(gl_FragCoord.x / 320 - 2.5, gl_FragCoord.y / 320 - 2);\n"
-"    vec2 c = pos;\n"
+"    vec2 px = gl_FragCoord.xy;\n"
+"    vec2 c = vec2(-2 + (px.x / width) * 3 + pos.x, -1 + (px.y / height) * 2 + pos.y);\n"
 
-"    for (int i = 0; i < 100; i++) {\n"
-"         c = mult(c, c) + pos;\n"
+"    int n = 0;\n"
+"    vec2 z = vec2(0.0f, 0.0f);\n"
+"    while (n < 80 && dist(z) <= 2) {\n"
+"         z = mult(z, z) + c;\n"
+"         n += 1;\n"
 "   }\n"
 
-"    color = vec4(0.0f, 0.0f, 0.0f, 1.0f);\n"
-"    if (leng(c) < 2) {\n"
-"       color = vec4(c.x * c.x, c.y * c.y, 0.0f, 1.0f);\n"
-"    }\n"
+"    color = vec4(n / 80.0f, n * 2 / 40.0f, 1 - n / 80.0f, 1.0f);\n"
 "}\n";
  
 static void error_callback(int error, const char* description)
@@ -72,13 +81,28 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
+    
+    if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
+        pos[0] -= 0.1f;
+    
+    if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
+        pos[0] += 0.1f;
+    
+    if (key == GLFW_KEY_UP && action == GLFW_PRESS)
+        pos[1] += 0.1f;
+    
+    if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
+        pos[1] -= 0.1f;
+    
+    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+        zoom += 1.0f;
 }
  
 int main(void)
 {
     GLFWwindow* window;
     GLuint vertex_shader, fragment_shader, program;
-    GLint mvp_location;
+    GLint pos_location, zoom_location, width_location, height_location;
  
     glfwSetErrorCallback(error_callback);
  
@@ -91,7 +115,7 @@ int main(void)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_CENTER_CURSOR, GL_TRUE);
 
-    window = glfwCreateWindow(640, 640, "Mandelbrot Set", NULL, NULL);
+    window = glfwCreateWindow(width, height, "Mandelbrot Set", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -179,37 +203,30 @@ int main(void)
         free(info_buffer);
     }
  
-    mvp_location = glGetUniformLocation(program, "mvp");
+    pos_location = glGetUniformLocation(program, "pos");
+    zoom_location = glGetUniformLocation(program, "zoom");
+ 
+    width_location = glGetUniformLocation(program, "width");
+    height_location = glGetUniformLocation(program, "height");
 
     while (!glfwWindowShouldClose(window))
     {
         float ratio;
         int width, height;
-        mat4x4 m, v, p, mvp;
  
         glfwGetFramebufferSize(window, &width, &height);
         ratio = width / (float) height;
  
         glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT);
- 
-        // Model
-        mat4x4_identity(m);
-        mat4x4_translate(m, 0.f, 0.f, -1.f);
-
-        // View
-        mat4x4_identity(v);
-        
-        // Projection
-        mat4x4_identity(p);
-        mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-
-        // Generate MVP
-        mat4x4_mul(mvp, v, m);
-        mat4x4_mul(mvp, p, mvp);
- 
+  
         glUseProgram(program);
-        glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) mvp);
+        
+        glUniform2fv(pos_location, 1, pos);
+        glUniform1d(zoom_location, zoom);
+        glUniform1f(width_location, (float) width);
+        glUniform1f(height_location, (float) height);
+        
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
  
         glfwSwapBuffers(window);

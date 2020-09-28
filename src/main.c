@@ -7,22 +7,22 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <complex.h>
+
 #include "linmath.h"
 
-float x = 0;
-float y = 0;
-float z = 0;
+long double complex pos;
+long double zoom;
 
 static const struct
 {
     float x, y;
-    float r, g, b;
 } vertices[4] =
 {
-    {  0.5f,  0.5f, 1.f, 0.f, 0.f }, // top right
-    {  0.5f, -0.5f, 0.f, 1.f, 0.f }, // bottom right
-    { -0.5f, -0.5f, 0.f, 0.f, 1.f }, // bottom left
-    { -0.5f,  0.5f, 1.f, 0.f, 1.f }  // top left
+    {  1 + (1/3.0f),  1.0f }, // top right
+    {  1 + (1/3.0f), -1.0f }, // bottom right
+    { -1 - (1/3.0f), -1.0f }, // bottom left
+    { -1 - (1/3.0f),  1.0f }  // top left
 };
 
 static int indicies[6] = {
@@ -34,27 +34,33 @@ static const char* vertex_shader_text =
 "#version 330 core\n"
 
 "layout(location = 0) in vec2 vPos;\n"
-"layout(location = 1) in vec3 vCol;\n"
-
-"out vec3 fcolor;\n"
-
 "uniform mat4 mvp;\n"
 
 "void main()\n"
 "{\n"
 "    gl_Position = mvp * vec4(vPos, 0.0, 1.0);\n"
-"    fcolor = vCol;\n"
 "}\n";
  
 static const char* fragment_shader_text =
 "#version 330 core\n"
+"#define mult(a, b) vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x) \n"
+"#define leng(c) sqrt(c.x * c.x + c.y * c.y) \n"
 
-"in vec3 fcolor;\n"
 "out vec4 color;\n"
 
 "void main()\n"
 "{\n"
-"    color = vec4(fcolor, 1.0);\n"
+"    vec2 pos = vec2(gl_FragCoord.x / 320 - 2.5, gl_FragCoord.y / 320 - 2);\n"
+"    vec2 c = pos;\n"
+
+"    for (int i = 0; i < 100; i++) {\n"
+"         c = mult(c, c) + pos;\n"
+"   }\n"
+
+"    color = vec4(0.0f, 0.0f, 0.0f, 1.0f);\n"
+"    if (leng(c) < 2) {\n"
+"       color = vec4(c.x * c.x, c.y * c.y, 0.0f, 1.0f);\n"
+"    }\n"
 "}\n";
  
 static void error_callback(int error, const char* description)
@@ -66,27 +72,6 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
-
-    const float step = 0.1;
-
-    if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
-        x -= step;
-
-    if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
-        x += step;
-
-    if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
-        y -= step;
-
-    if (key == GLFW_KEY_UP && action == GLFW_PRESS)
-        y += step;
-
-    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
-        z += step;
-
-    if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS)
-        z -= step;
-
 }
  
 int main(void)
@@ -106,7 +91,7 @@ int main(void)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_CENTER_CURSOR, GL_TRUE);
 
-    window = glfwCreateWindow(640, 480, "Simple example", NULL, NULL);
+    window = glfwCreateWindow(640, 640, "Mandelbrot Set", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -118,8 +103,6 @@ int main(void)
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
  
-    // NOTE: OpenGL error checks have been omitted for brevity
-
     unsigned int vao, ebo, vbo;
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
@@ -168,7 +151,7 @@ int main(void)
         info_buffer = (char *)malloc(info_log_length + 1);
         glGetShaderInfoLog(vertex_shader, info_log_length, NULL, info_buffer);
 
-        fprintf(stderr, "%s\n", info_buffer);
+        fprintf(stderr, "Vertex %s\n", info_buffer);
         free(info_buffer);
     }
 
@@ -180,7 +163,7 @@ int main(void)
         info_buffer = (char *)malloc(info_log_length + 1);
         glGetShaderInfoLog(fragment_shader, info_log_length, NULL, info_buffer);
 
-        fprintf(stderr, "%s\n", info_buffer);
+        fprintf(stderr, "Fragment %s\n", info_buffer);
         free(info_buffer);
     } 
 
@@ -213,18 +196,15 @@ int main(void)
         // Model
         mat4x4_identity(m);
         mat4x4_translate(m, 0.f, 0.f, -1.f);
-        mat4x4_rotate_Z(m, m, (float) glfwGetTime());
-
-        // Perspective
-        // mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-        mat4x4_perspective(p, M_PI_2, ratio, 0.1f, 100.f);
 
         // View
-        vec3 eye = { x, y, z };
-        vec3 center = { x, y, z -1.0f };
-        vec3 up = { 0.0f, 1.0f, 0.0f };
+        mat4x4_identity(v);
+        
+        // Projection
+        mat4x4_identity(p);
+        mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
 
-        mat4x4_look_at(v, eye, center, up);
+        // Generate MVP
         mat4x4_mul(mvp, v, m);
         mat4x4_mul(mvp, p, mvp);
  

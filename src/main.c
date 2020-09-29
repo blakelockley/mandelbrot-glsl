@@ -7,8 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <complex.h>
-
+#include "loader.h"
 #include "linmath.h"
 
 float pos[2] = { 0, 0 };
@@ -33,46 +32,6 @@ static int indicies[6] = {
     0, 1, 2
 };
  
-static const char* vertex_shader_text =
-"#version 330 core\n"
-
-"layout(location = 0) in vec2 vPos;\n"
-
-"void main()\n"
-"{\n"
-"    gl_Position = vec4(vPos, 0.0, 1.0);\n"
-"}\n";
- 
-static const char* fragment_shader_text =
-"#version 330 core\n"
-
-"#define mult(a, b) vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x) \n"
-"#define dist(c) sqrt(c.x * c.x + c.y * c.y) \n"
-
-"uniform vec2 pos;\n"
-"uniform float zoom;\n"
-
-"uniform float width;\n"
-"uniform float height;\n"
-
-"out vec4 color;\n"
-
-"void main()\n"
-"{\n"
-"    vec2 px = gl_FragCoord.xy;\n"
-"    vec2 c = vec2(-2 / zoom + (px.x / width) * (3 / zoom) + pos.x, -1 / zoom + (px.y / height) * (2 / zoom) + pos.y);\n"
-
-"    int n = 0;\n"
-"    vec2 z = vec2(0.0f, 0.0f);\n"
-"    while (n < 80 && dist(z) <= 2) {\n"
-"         z = mult(z, z) + c;\n"
-"         n += 1;\n"
-"   }\n"
-
-"   float a = n / 80.0f;\n"
-
-"   color = vec4(mix(vec3(3 / 255.0f, 207 / 255.0f, 252 / 255.0f), vec3(240 / 255.0f, 252 / 255.0f, 3 / 255.0f), a), 1.0f);\n"
-"}\n";
  
 static void error_callback(int error, const char* description)
 {
@@ -110,6 +69,9 @@ int main(void)
     GLint pos_location, zoom_location, width_location, height_location;
  
     glfwSetErrorCallback(error_callback);
+
+    const char * const vertex_shader_text = load_file("src/vert.glsl");
+    const char * const fragment_shader_text = load_file("src/frag.glsl");
  
     if (!glfwInit())
         exit(EXIT_FAILURE);
@@ -237,6 +199,9 @@ int main(void)
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    // free(vertex_shader_text);
+    // free(fragment_shader_text);
  
     glfwDestroyWindow(window);
  

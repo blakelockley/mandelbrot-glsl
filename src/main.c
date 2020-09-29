@@ -6,15 +6,22 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "loader.h"
 #include "linmath.h"
 
-float pos[2] = { 0, 0 };
+vec2 pos = { 0, 0 };
+vec2 vec = { 0, 0 };
+
 float zoom = 1.0f;
+float zoom_direction = 0.0f;
 
 int width = 640;
-int height = 480;
+int height = 640;
+
+struct timespec lastm = { 0 }, currentm;
+struct stat buffer;
 
 static struct
 {
@@ -43,80 +50,51 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     
-    if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
-        pos[0] -= 1 / zoom;
+    else if (key == GLFW_KEY_LEFT && action == GLFW_PRESS)
+        vec[0] = -1 / zoom;
     
-    if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
-        pos[0] += 1 / zoom;
+    else if (key == GLFW_KEY_LEFT && action == GLFW_RELEASE)
+        vec[0] = 0;
     
-    if (key == GLFW_KEY_UP && action == GLFW_PRESS)
-        pos[1] += 1 / zoom;
+    else if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS)
+        vec[0] = 1 / zoom;
     
-    if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
-        pos[1] -= 1 / zoom;
+    else if (key == GLFW_KEY_RIGHT && action == GLFW_RELEASE)
+        vec[0] = 0;
     
-    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
-        zoom *= 2;
+    else if (key == GLFW_KEY_UP && action == GLFW_PRESS)
+        vec[1] = 1 / zoom;
     
-    if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS)
-        zoom /= 2;
+    else if (key == GLFW_KEY_UP && action == GLFW_RELEASE)
+        vec[1] = 0;
+    
+    else if (key == GLFW_KEY_DOWN && action == GLFW_PRESS)
+        vec[1] = -1 / zoom;
+    
+    else if (key == GLFW_KEY_DOWN && action == GLFW_RELEASE)
+        vec[1] = 0;
+    
+    else if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+        zoom_direction = 1;
+    
+    else if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE)
+        zoom_direction = 0;
+    
+    else if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS)
+        zoom_direction = -1;
+    
+    else if (key == GLFW_KEY_BACKSPACE && action == GLFW_RELEASE)
+        zoom_direction = 0;
+    
 }
- 
-int main(void)
-{
-    GLFWwindow* window;
-    GLuint vertex_shader, fragment_shader, program;
-    GLint pos_location, zoom_location, width_location, height_location;
- 
-    glfwSetErrorCallback(error_callback);
+
+GLuint load_shader() {
 
     const char * const vertex_shader_text = load_file("src/vert.glsl");
     const char * const fragment_shader_text = load_file("src/frag.glsl");
- 
-    if (!glfwInit())
-        exit(EXIT_FAILURE);
- 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_CENTER_CURSOR, GL_TRUE);
 
-    window = glfwCreateWindow(width, height, "Mandelbrot Set", NULL, NULL);
-    if (!window)
-    {
-        glfwTerminate();
-        exit(EXIT_FAILURE);
-    }
- 
-    glfwSetKeyCallback(window, key_callback);
- 
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);
- 
-    unsigned int vao, ebo, vbo;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    
-    glGenBuffers(1, &ebo);
+    GLuint vertex_shader, fragment_shader, program;
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indicies), indicies, GL_STATIC_DRAW);
- 
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    // vPos
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(vertices[0]), (void*) 0);
-    
-    // vCol
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(vertices[0]), (void*) (sizeof(float) * 2));
- 
     vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
     glCompileShader(vertex_shader);
@@ -169,6 +147,69 @@ int main(void)
         fprintf(stderr, "%s\n", info_buffer);
         free(info_buffer);
     }
+
+    free((void *) vertex_shader_text);
+    free((void *) fragment_shader_text);
+
+    return program;
+}
+ 
+int main(void)
+{
+    GLFWwindow* window;
+    GLint pos_location, zoom_location, width_location, height_location;
+    GLuint program;
+ 
+    glfwSetErrorCallback(error_callback);
+ 
+    if (!glfwInit())
+        exit(EXIT_FAILURE);
+ 
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_CENTER_CURSOR, GL_TRUE);
+
+    window = glfwCreateWindow(width, height, "Mandelbrot Set", NULL, NULL);
+    if (!window)
+    {
+        glfwTerminate();
+        exit(EXIT_FAILURE);
+    }
+ 
+    glfwSetKeyCallback(window, key_callback);
+ 
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1);
+ 
+    unsigned int vao, ebo, vbo;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+    
+    glGenBuffers(1, &ebo);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indicies), indicies, GL_STATIC_DRAW);
+ 
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    // vPos
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(vertices[0]), (void*) 0);
+    
+    // vCol
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+                          sizeof(vertices[0]), (void*) (sizeof(float) * 2));
+
+    program = load_shader();
+
+    stat("src/frag.glsl", &buffer);
+    lastm = buffer.st_mtimespec;
  
     pos_location = glGetUniformLocation(program, "pos");
     zoom_location = glGetUniformLocation(program, "zoom");
@@ -176,10 +217,26 @@ int main(void)
     width_location = glGetUniformLocation(program, "width");
     height_location = glGetUniformLocation(program, "height");
 
+    double current_time, delta;
+    double previous_time = glfwGetTime();
+    
     while (!glfwWindowShouldClose(window))
     {
         float ratio;
         int width, height;
+
+        current_time = glfwGetTime();
+        delta = current_time - previous_time;
+        previous_time = current_time;
+
+        pos[0] += vec[0] * delta;
+        pos[1] += vec[1] * delta;
+
+        if (zoom_direction)
+            zoom += delta * zoom * zoom_direction;
+
+        if (zoom < 1)
+            zoom = 1;
  
         glfwGetFramebufferSize(window, &width, &height);
         ratio = width / (float) height;
@@ -198,10 +255,17 @@ int main(void)
  
         glfwSwapBuffers(window);
         glfwPollEvents();
-    }
 
-    // free(vertex_shader_text);
-    // free(fragment_shader_text);
+        stat("src/frag.glsl", &buffer);
+        currentm = buffer.st_mtimespec;
+
+        if (currentm.tv_sec > lastm.tv_sec) {
+            printf("Reloading fragment shader...\n");
+
+            program = load_shader();
+            lastm = currentm;
+        }
+    }
  
     glfwDestroyWindow(window);
  

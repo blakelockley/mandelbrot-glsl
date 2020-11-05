@@ -3,9 +3,9 @@
 #define mult(a, b) vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x) 
 #define dist(c) sqrt(c.x * c.x + c.y * c.y) 
 
-const int MAX_ITER = 200;
-const vec3 COLOUR_A = vec3(0.2, 0.8, 0.9);
-const vec3 COLOUR_B = vec3(1,1,1);
+const int MAX_ITER = 20;
+const vec3 COLOUR_A = vec3(1, 1, 1);
+const vec3 COLOUR_B = vec3(0, 0, 0);
 
 uniform vec2 pos;
 uniform float zoom;
@@ -18,7 +18,7 @@ out vec4 color;
 void main()
 {
     vec2 px = gl_FragCoord.xy;
-    double x = px.x / width;
+    double x = px.x / width * 2;
     double y = px.y / height;
 
     vec2 c = vec2(-2.5 / zoom + x * (4 / zoom ) + pos.x, (-2 / zoom) + y * (4 / zoom) + pos.y);

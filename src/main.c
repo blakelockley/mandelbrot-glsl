@@ -14,10 +14,12 @@
 vec2 pos = { 0, 0 };
 vec2 vec = { 0, 0 };
 
+vec2 c = { 0.285, 0.01 };
+
 float zoom = 1.0f;
 float zoom_direction = 0.0f;
 
-int width = 640;
+int width = 1280;
 int height = 640;
 
 struct timespec lastm = { 0 }, currentm;
@@ -26,17 +28,26 @@ struct stat buffer;
 static struct
 {
     float x, y;
-} vertices[4] =
+} vertices[8] =
 {
+    {  0,  1.0f }, // top right
+    {  0, -1.0f }, // bottom right
+    { -1, -1.0f }, // bottom left
+    { -1,  1.0f },  // top left
+    
+    // Second triangle
     {  1,  1.0f }, // top right
     {  1, -1.0f }, // bottom right
-    { -1, -1.0f }, // bottom left
-    { -1,  1.0f }  // top left
+    {  0, -1.0f }, // bottom left
+    {  0,  1.0f }  // top left
 };
 
-static int indicies[6] = {
+static int indicies[12] = {
     3, 0, 2,
-    0, 1, 2
+    0, 1, 2,
+
+    7, 4, 6,
+    4, 5, 6
 };
  
  
@@ -88,10 +99,16 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
     
 }
 
-GLuint load_shader() {
+static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
+{
+    c[0] = xpos / (width / 2) * 2 - 1;
+    c[1] = ypos / height * -2 + 1;
+}
+
+GLuint load_shader(char *frag_filename) {
 
     const char * const vertex_shader_text = load_file("src/vert.glsl");
-    const char * const fragment_shader_text = load_file("src/frag.glsl");
+    const char * const fragment_shader_text = load_file(frag_filename);
 
     GLuint vertex_shader, fragment_shader, program;
 
@@ -158,7 +175,8 @@ int main(void)
 {
     GLFWwindow* window;
     GLint pos_location, zoom_location, width_location, height_location;
-    GLuint program;
+    GLint j_pos_location, j_zoom_location, j_width_location, j_height_location, j_c_location;
+    GLuint program, program_j;
  
     glfwSetErrorCallback(error_callback);
  
@@ -179,6 +197,7 @@ int main(void)
     }
  
     glfwSetKeyCallback(window, key_callback);
+    glfwSetCursorPosCallback(window, cursor_position_callback);
  
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
@@ -201,21 +220,23 @@ int main(void)
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,
                           sizeof(vertices[0]), (void*) 0);
     
-    // vCol
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(vertices[0]), (void*) (sizeof(float) * 2));
+    program = load_shader("src/frag_m.glsl");
+    program_j = load_shader("src/frag_j.glsl");
 
-    program = load_shader();
-
-    stat("src/frag.glsl", &buffer);
+    stat("src/frag_m.glsl", &buffer);
     lastm = buffer.st_mtimespec;
  
     pos_location = glGetUniformLocation(program, "pos");
     zoom_location = glGetUniformLocation(program, "zoom");
- 
     width_location = glGetUniformLocation(program, "width");
     height_location = glGetUniformLocation(program, "height");
+ 
+    // Julia set
+    j_pos_location = glGetUniformLocation(program_j, "pos");
+    j_zoom_location = glGetUniformLocation(program_j, "zoom");
+    j_width_location = glGetUniformLocation(program_j, "width");
+    j_height_location = glGetUniformLocation(program_j, "height");
+    j_c_location = glGetUniformLocation(program_j, "c");
 
     double current_time, delta;
     double previous_time = glfwGetTime();
@@ -243,26 +264,32 @@ int main(void)
  
         glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT);
-  
+
         glUseProgram(program);
-        
         glUniform2fv(pos_location, 1, pos);
         glUniform1f(zoom_location, zoom);
         glUniform1f(width_location, (float) width);
         glUniform1f(height_location, (float) height);
-        
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+  
+        glUseProgram(program_j);
+        glUniform2fv(j_pos_location, 1, pos);
+        glUniform1f(j_zoom_location, 1.0f);
+        glUniform1f(j_width_location, (float) width);
+        glUniform1f(j_height_location, (float) height);
+        glUniform2fv(j_c_location, 1, c);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *) (6 * sizeof(int)));
  
         glfwSwapBuffers(window);
         glfwPollEvents();
 
-        stat("src/frag.glsl", &buffer);
+        stat("src/frag_m.glsl", &buffer);
         currentm = buffer.st_mtimespec;
 
         if (currentm.tv_sec > lastm.tv_sec) {
             printf("Reloading fragment shader...\n");
 
-            program = load_shader();
+            program = load_shader("src/frag_m.glsl");
             lastm = currentm;
         }
     }

@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 
 #include "loader.h"
+#include "text.h"
 #include "linmath.h"
 
 vec2 pos = { 0, 0 };
@@ -195,19 +196,22 @@ int main(void)
         glfwTerminate();
         exit(EXIT_FAILURE);
     }
- 
+
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
  
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
+    
+    glEnable( GL_BLEND );
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
  
     unsigned int vao, ebo, vbo;
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
     
     glGenBuffers(1, &ebo);
-
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indicies), indicies, GL_STATIC_DRAW);
  
@@ -238,6 +242,9 @@ int main(void)
     j_height_location = glGetUniformLocation(program_j, "height");
     j_c_location = glGetUniformLocation(program_j, "c");
 
+    init_text();
+
+    char str[32];
     double current_time, delta;
     double previous_time = glfwGetTime();
     
@@ -265,6 +272,8 @@ int main(void)
         glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT);
 
+        glBindVertexArray(vao);
+
         glUseProgram(program);
         glUniform2fv(pos_location, 1, pos);
         glUniform1f(zoom_location, zoom);
@@ -279,6 +288,11 @@ int main(void)
         glUniform1f(j_height_location, (float) height);
         glUniform2fv(j_c_location, 1, c);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, (void *) (6 * sizeof(int)));
+
+        vec2 textPos = { -1, -0.98 };
+        sprintf(str, "(%f, %fi)", c[0], c[1]);
+
+        render_text(str, textPos);
  
         glfwSwapBuffers(window);
         glfwPollEvents();

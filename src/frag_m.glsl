@@ -3,9 +3,9 @@
 #define mult(a, b) vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x) 
 #define dist(c) sqrt(c.x * c.x + c.y * c.y) 
 
-const int MAX_ITER = 20;
-const vec3 COLOUR_A = vec3(1, 1, 1);
-const vec3 COLOUR_B = vec3(0, 0, 0);
+const int MAX_ITER = 100;
+const vec3 COLOUR_A = vec3(0.5, 0.5, 1);
+const vec3 COLOUR_B = vec3(1, 0.5, 0.2);
 
 uniform vec2 pos;
 uniform float zoom;

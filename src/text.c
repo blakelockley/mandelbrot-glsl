@@ -82,6 +82,7 @@ void deinit_text()
 
 void render_text(char *text, vec2 pos)
 {
+    const float posX = pos[0];
     const float scale = 4;
 
     const float char_width = 8.0f / width * scale;
@@ -92,6 +93,18 @@ void render_text(char *text, vec2 pos)
 
     for (int i = 0; i < strlen(text); i++)
     {
+        // Validate char
+
+        if (text[i] == '\n')
+        {
+            pos[0] = posX;
+            pos[1] -= char_height;
+            continue;
+        }
+
+        if (!(32 <= text[i] && text[i] < 127))
+            continue;
+
         // Set quad position
 
         // right, top

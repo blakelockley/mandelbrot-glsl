@@ -6,10 +6,9 @@
 static int has_init = 0;
 static GLuint program;
 static GLuint texture;
-static GLuint char_sampler_location;
 static GLuint vao, ebo, vbo[2];
 
-static unsigned char* image;
+static unsigned char *image;
 
 extern int width, height;
 
@@ -29,78 +28,17 @@ float texCoords[] = {
 
 int indicies[6] = {
     3, 0, 2,
-    0, 1, 2
-};
+    0, 1, 2};
 
 void init_text()
 {
-
     // Check and set init flag
     if (has_init)
         return;
+
     has_init = 1;
 
-    // Shader
-    const char *const vertex_shader_text = load_file("src/text_vert.glsl");
-    const char *const fragment_shader_text = load_file("src/text_frag.glsl");
-
-    GLuint vertex_shader, fragment_shader;
-
-    vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
-    glCompileShader(vertex_shader);
-
-    fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
-    glCompileShader(fragment_shader);
-
-    program = glCreateProgram();
-    glAttachShader(program, vertex_shader);
-    glAttachShader(program, fragment_shader);
-    glLinkProgram(program);
-
-    GLint result = GL_FALSE;
-    GLint info_log_length;
-    GLchar *info_buffer;
-
-    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &result);
-    glGetShaderiv(vertex_shader, GL_INFO_LOG_LENGTH, &info_log_length);
-
-    if (info_log_length > 0)
-    {
-        info_buffer = (char *)malloc(info_log_length + 1);
-        glGetShaderInfoLog(vertex_shader, info_log_length, NULL, info_buffer);
-
-        fprintf(stderr, "Vertex %s\n", info_buffer);
-        free(info_buffer);
-    }
-
-    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &result);
-    glGetShaderiv(fragment_shader, GL_INFO_LOG_LENGTH, &info_log_length);
-
-    if (info_log_length > 0)
-    {
-        info_buffer = (char *)malloc(info_log_length + 1);
-        glGetShaderInfoLog(fragment_shader, info_log_length, NULL, info_buffer);
-
-        fprintf(stderr, "Fragment %s\n", info_buffer);
-        free(info_buffer);
-    }
-
-    glGetProgramiv(program, GL_LINK_STATUS, &result);
-    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &info_log_length);
-
-    if (info_log_length > 0)
-    {
-        info_buffer = (char *)malloc(info_log_length + 1);
-        glGetProgramInfoLog(program, info_log_length, NULL, info_buffer);
-
-        fprintf(stderr, "%s\n", info_buffer);
-        free(info_buffer);
-    }
-
-    free((void *)vertex_shader_text);
-    free((void *)fragment_shader_text);
+    program = load_shader("src/text_vert.glsl", "src/text_frag.glsl");
 
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
@@ -134,9 +72,12 @@ void init_text()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    glPixelStorei( GL_UNPACK_ROW_LENGTH, w );
-    
-    //stbi_image_free(image);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, w);
+}
+
+void deinit_text()
+{
+    stbi_image_free(image);
 }
 
 void render_text(char *text, vec2 pos)
@@ -187,5 +128,4 @@ void render_text(char *text, vec2 pos)
 
         pos[0] += char_width;
     }
-
 }

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "loader.h"
+#include "shader.h"
 #include "linmath.h"
 
 #define GL_SILENCE_DEPRECATION
@@ -17,6 +17,7 @@
  * Initialse text shader and renderer.
  */
 void init_text();
+void deinit_text();
 
 /**
  * Render text to the screen at given position.

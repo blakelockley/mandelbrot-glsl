@@ -19,4 +19,6 @@
 char *load_file(char *filename);
 GLuint load_shader(char *vert_filename, char *frag_filename);
 
+// TODO: Destroy shader clean up
+
 #endif
